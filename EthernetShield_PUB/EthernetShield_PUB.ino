@@ -32,7 +32,7 @@ void loop() {
   
   EthernetClient *client;
   char pubmsg[64] = "{\"card\":[\"AB CD EF 12 34 56 78 9A 11\"]}"; 
-
+  
   Serial.print(F("publishing message: "));
   Serial.println(pubmsg);
   client = PubNub.publish("mindreader", pubmsg);
@@ -41,6 +41,14 @@ void loop() {
   } else {
     client->stop();
   }
-  
+  Serial.print(F("Memory left: "));
+  Serial.println(free_ram());
   delay(1000);
 }
+
+int free_ram() {
+  extern int __heap_start, *__brkval;
+  int v;
+  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
+}
+
