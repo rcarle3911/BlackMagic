@@ -94,7 +94,6 @@ void loop() {
       Serial.print(F("Unknown error"));
     }
   }
-  delay(1000);
 }
 
 //Gracefully handles a reader that is already configured and already reading continuously
