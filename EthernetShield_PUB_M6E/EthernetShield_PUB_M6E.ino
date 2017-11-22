@@ -9,6 +9,10 @@
 #include "SparkFun_UHF_RFID_Reader.h" //Library for controlling the M6E Nano module
 #include <PubNub.h>
 
+#define GLED 7
+#define RLED 6
+#define M6E_ENABLE
+
 byte mac[] = {0x90,0xa2,0xda,0x10,0x10,0x4e};
 IPAddress ip(192, 168, 1, 177);
 
@@ -18,6 +22,15 @@ RFID nano; //Create instance
 void setup() {  
   Serial.begin(115200);
   Serial.println(F("Serial set up"));
+  
+  pinMode(GLED, OUTPUT);
+  pinMode(RLED, OUTPUT);
+  pinMode(M6E_ENABLE, OUTPUT);
+
+  blinkLED(GLED);
+  blinkLED(RLED);
+
+  digitalWrite(M6E_ENABLE, HIGH); //Turns on M6E
 
   if (Ethernet.begin(mac) == 0) {
     Serial.println(F("Failed to configure Ethernet using DHCP"));
@@ -60,7 +73,7 @@ void loop() {
     }
     else if (responseType == RESPONSE_IS_TAGFOUND)
     {
-   
+      solidLED(GLED);
       EthernetClient *client;
       char pubmsg[64] = "{\"card\":[\"";
 
@@ -79,14 +92,17 @@ void loop() {
       Serial.println(pubmsg);
       client = PubNub.publish("mindreader", pubmsg);
       if (!client) {
+        blinkLED(RLED);
         Serial.println(F("publishing error"));
       } else {
+        blinkLED(GLED);
         client->stop();
       }
     }
     else if (responseType == ERROR_CORRUPT_RESPONSE)
     {
       Serial.println(F("Bad CRC"));
+      solidLED(RLED);
     }
     else
     {
@@ -94,6 +110,21 @@ void loop() {
       Serial.print(F("Unknown error"));
     }
   }
+}
+
+void blinkLED(int pin) {
+  for (int i = 0; i < 5; i++) {
+      digitalWrite(pin, HIGH);
+      delay(100);
+      digitalWrite(pin, LOW);
+      delay(100);
+  }
+}
+
+void solidLED(int pin) {
+  digitalWrite(pin, HIGH);
+  delay(1000);
+  digitalWrite(pin, LOW);
 }
 
 //Gracefully handles a reader that is already configured and already reading continuously
