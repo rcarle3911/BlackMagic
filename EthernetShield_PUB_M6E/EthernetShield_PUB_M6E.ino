@@ -19,6 +19,20 @@ IPAddress ip(192, 168, 1, 177);
 SoftwareSerial softSerial(2, 3); //RX, TX
 RFID nano; //Create instance
 
+struct Card {
+  byte epc[12];
+  unsigned long rTime;
+  Card *next;
+  Card *prev;
+};
+
+Card *head;
+Card *tail;
+
+byte cardCount = 0;
+unsigned long now;
+
+
 void setup() {  
   Serial.begin(115200);
   Serial.println(F("Serial set up"));
@@ -29,6 +43,8 @@ void setup() {
 
   blinkLED(GLED);
   blinkLED(RLED);
+
+  now = millis();
 
   digitalWrite(M6E_ENABLE, HIGH); //Turns on M6E
 
@@ -62,6 +78,11 @@ void setup() {
 
 void loop() {
   Ethernet.maintain();
+  unsigned long snap = millis();
+  if ((now - snap) > 3000) {
+    now = snap;
+    delOldCards();
+  }
 
   if (nano.check() == true) {
     
@@ -73,36 +94,44 @@ void loop() {
     }
     else if (responseType == RESPONSE_IS_TAGFOUND)
     {
-      solidLED(GLED);
-      EthernetClient *client;
-      char pubmsg[64] = "{\"card\":[\"";
+      digitalWrite(GLED, HIGH);    
 
-      byte tagEPCBytes = nano.getTagEPCBytes(); //Get the number of bytes of EPC from response
-
-      //Print EPC bytes, this is a subsection of bytes from the response/msg array
+      byte tagEPCBytes = min(12, nano.getTagEPCBytes()); //Get the number of bytes of EPC from response
+      byte cardBytes[12];
 
       for (byte x = 0 ; x < tagEPCBytes ; x++)
       {
-        if (nano.msg[31 + x] < 0x10) sprintf(pubmsg + strlen(pubmsg), "0%X ", nano.msg[31 + x]);
-        else sprintf(pubmsg + strlen(pubmsg), "%X ", nano.msg[31 + x]);
+        cardBytes [x] = nano.msg[31 + x];
       }
-      strcat(pubmsg, "\"]}"); 
 
-      Serial.print(F("publishing message: "));
-      Serial.println(pubmsg);
-      client = PubNub.publish("mindreader", pubmsg);
-      if (!client) {
-        blinkLED(RLED);
-        Serial.println(F("publishing error"));
-      } else {
-        blinkLED(GLED);
-        client->stop();
+      if (newCard(cardBytes, tagEPCBytes)) {
+        EthernetClient *client;
+        char pubmsg[64] = "{\"card\":[\"";
+  
+        //Print EPC bytes, this is a subsection of bytes from the response/msg array
+        for (byte x = 0 ; x < tagEPCBytes ; x++)
+        {
+          if (cardBytes[x] < 0x10) sprintf(pubmsg + strlen(pubmsg), "0%X ",cardBytes[x]);
+          else sprintf(pubmsg + strlen(pubmsg), "%X ", cardBytes[x]);
+        }
+        strcat(pubmsg, "\"]}"); 
+  
+        Serial.print(F("publishing message: "));
+        Serial.println(pubmsg);
+        client = PubNub.publish("mindreader", pubmsg);
+        digitalWrite(GLED, LOW);
+        if (!client) {
+          blinkLED(RLED);
+          Serial.println(F("publishing error"));
+        } else {
+          client->stop();
+        }
       }
+
     }
     else if (responseType == ERROR_CORRUPT_RESPONSE)
     {
       Serial.println(F("Bad CRC"));
-      solidLED(RLED);
     }
     else
     {
@@ -110,6 +139,44 @@ void loop() {
       Serial.print(F("Unknown error"));
     }
   }
+}
+
+void delOldCards() {  
+  Card *current = tail;
+  while (current) {
+    if ((now - current->rTime) > 30000) {
+      tail = current->prev;
+      free(current);
+      current = tail;
+      cardCount--;
+    } else {
+      break;
+    }
+  }
+}
+
+boolean newCard(byte c[], byte len) {
+  Card *current = head;
+  while (current) {
+    if (aEqual(c, current->epc, len)) return false;
+  }
+  current = malloc(sizeof(*current));
+  for (byte i = 0; i < len; i++) {
+    current->epc[i] = c[i];
+  }
+  current->rTime = millis();
+  current->next = head;
+  head = current;
+  if (cardCount == 0) tail = head;
+  cardCount++;
+  return true;
+}
+
+boolean aEqual(byte a[], byte b[], int len) {
+  for (byte i = 0; i < len; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }
 
 void blinkLED(int pin) {
