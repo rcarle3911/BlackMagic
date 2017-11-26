@@ -166,6 +166,7 @@ boolean newCard(byte c[], byte len) {
   }
   current->rTime = millis();
   current->next = head;
+  if (head) head->prev = current;
   head = current;
   if (cardCount == 0) tail = head;
   cardCount++;
