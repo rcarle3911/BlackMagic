@@ -11,7 +11,7 @@
 
 #define GLED 7
 #define RLED 6
-#define M6E_ENABLE
+#define M6E_ENABLE 8
 
 byte mac[] = {0x90,0xa2,0xda,0x10,0x10,0x4e};
 IPAddress ip(192, 168, 1, 177);
