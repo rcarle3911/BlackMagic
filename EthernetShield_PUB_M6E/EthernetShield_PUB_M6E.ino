@@ -82,6 +82,8 @@ void loop() {
   if ((now - snap) > 3000) {
     now = snap;
     delOldCards();
+    Serial.print(F("Memory left: "));
+    Serial.println(free_ram());
   }
 
   if (nano.check() == true) {
@@ -146,7 +148,8 @@ void delOldCards() {
   while (current) {
     if ((now - current->rTime) > 30000) {
       tail = current->prev;
-      free(current);
+      tail->next = NULL;
+      delete current;
       current = tail;
       cardCount--;
     } else {
@@ -155,15 +158,17 @@ void delOldCards() {
   }
 }
 
-boolean newCard(byte c[], byte len) {
+bool newCard(byte c[], byte len) {
   Card *current = head;
   while (current) {
     if (aEqual(c, current->epc, len)) return false;
+    current = current->next;
   }
-  current = malloc(sizeof(*current));
+  current = new Card();
   for (byte i = 0; i < len; i++) {
     current->epc[i] = c[i];
   }
+  current->prev = NULL;
   current->rTime = millis();
   current->next = head;
   if (head) head->prev = current;
@@ -173,7 +178,7 @@ boolean newCard(byte c[], byte len) {
   return true;
 }
 
-boolean aEqual(byte a[], byte b[], int len) {
+bool aEqual(byte a[], byte b[], int len) {
   for (byte i = 0; i < len; i++) {
     if (a[i] != b[i]) return false;
   }
@@ -240,4 +245,10 @@ boolean setupNano(long baudRate)
   nano.setAntennaPort(); //Set TX/RX antenna ports to 1
 
   return (true); //We are ready to rock
+}
+
+int free_ram() {
+  extern int __heap_start, *__brkval;
+  int v;
+  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
 }
