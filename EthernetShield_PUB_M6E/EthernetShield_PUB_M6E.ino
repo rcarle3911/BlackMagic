@@ -22,6 +22,7 @@ RFID nano; //Create instance
 struct Card {
   byte epc[12];
   unsigned long rTime;
+  bool pbSent;
   Card *next;
   Card *prev;
 };
@@ -31,7 +32,7 @@ Card *tail;
 
 byte cardCount = 0;
 unsigned long now;
-
+bool cardDetect;
 
 void setup() {  
   Serial.begin(115200);
@@ -45,6 +46,7 @@ void setup() {
   blinkLED(RLED);
 
   now = millis();
+  cardDetect = false;
 
   digitalWrite(M6E_ENABLE, HIGH); //Turns on M6E
 
@@ -82,8 +84,9 @@ void loop() {
   if ((now - snap) > 3000) {
     now = snap;
     delOldCards();
+    if (cardDetect) pubSend();
     Serial.print(F("Memory left: "));
-    Serial.println(free_ram());
+    Serial.println(free_ram());    
   }
 
   if (nano.check() == true) {
@@ -107,27 +110,7 @@ void loop() {
       }
 
       if (newCard(cardBytes, tagEPCBytes)) {
-        EthernetClient *client;
-        char pubmsg[64] = "{\"card\":[\"";
-  
-        //Print EPC bytes, this is a subsection of bytes from the response/msg array
-        for (byte x = 0 ; x < tagEPCBytes ; x++)
-        {
-          if (cardBytes[x] < 0x10) sprintf(pubmsg + strlen(pubmsg), "0%X ",cardBytes[x]);
-          else sprintf(pubmsg + strlen(pubmsg), "%X ", cardBytes[x]);
-        }
-        strcat(pubmsg, "\"]}"); 
-  
-        Serial.print(F("publishing message: "));
-        Serial.println(pubmsg);
-        client = PubNub.publish("mindreader", pubmsg);
-        digitalWrite(GLED, LOW);
-        if (!client) {
-          blinkLED(RLED);
-          Serial.println(F("publishing error"));
-        } else {
-          client->stop();
-        }
+        cardDetect = true;
       }
 
     }
@@ -140,6 +123,48 @@ void loop() {
       //Unknown response
       Serial.print(F("Unknown error"));
     }
+  }
+}
+
+void pubSend() {
+  EthernetClient *client;
+  char pubmsg[128] = "{\"cards\":[\"";
+
+  Card *current = head;
+  while (current) {
+    if (!current->pbSent) {
+      for (byte x = 0 ; x < 12 ; x++)
+      {
+        if (current->epc[x] < 0x10) {
+          sprintf(pubmsg + strlen(pubmsg), "0%X ",current->epc[x]);
+        }
+        else {
+          sprintf(pubmsg + strlen(pubmsg), "%X ", current->epc[x]);
+        }
+      }
+      pubmsg[strlen(pubmsg) - 1] = '\0';
+      strcat(pubmsg, "\", \"");
+    }
+    current = current->next;
+  }
+  pubmsg[strlen(pubmsg) - 3] = '\0';
+  strcat(pubmsg, "]}");
+
+  Serial.print(F("publishing message: "));
+  Serial.println(pubmsg);
+  client = PubNub.publish("mindreader", pubmsg);
+  digitalWrite(GLED, LOW);
+  if (!client) {
+    blinkLED(RLED);
+    Serial.println(F("publishing error"));
+  } else {
+    current = head;
+    while (current) {
+      current->pbSent = true;
+      current = current->next;
+    }
+    cardDetect = false;
+    client->stop();
   }
 }
 
@@ -171,6 +196,7 @@ bool newCard(byte c[], byte len) {
   current->prev = NULL;
   current->rTime = millis();
   current->next = head;
+  current->pbSent = false;
   if (head) head->prev = current;
   head = current;
   if (cardCount == 0) tail = head;
