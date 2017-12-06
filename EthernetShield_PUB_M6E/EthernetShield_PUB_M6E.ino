@@ -82,7 +82,7 @@ void loop() {
   Ethernet.maintain();
   
   unsigned long snap = millis();
-  if ((now - snap) > 3000) {
+  if ((snap - now) > 3000) {
     now = snap;
     delOldCards();
     if (cardDetect) pubSend();
