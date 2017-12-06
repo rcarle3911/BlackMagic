@@ -48,7 +48,7 @@ void setup() {
   now = millis();
   cardDetect = false;
 
-  digitalWrite(M6E_ENABLE, HIGH); //Turns on M6E
+  digitalWrite(M6E_ENABLE, HIGH); //Turns on M6E does nothing if pin is not connected
 
   if (Ethernet.begin(mac) == 0) {
     Serial.println(F("Failed to configure Ethernet using DHCP"));
@@ -80,6 +80,7 @@ void setup() {
 
 void loop() {
   Ethernet.maintain();
+  /** Grouping cards code
   unsigned long snap = millis();
   if ((now - snap) > 3000) {
     now = snap;
@@ -88,7 +89,7 @@ void loop() {
     Serial.print(F("Memory left: "));
     Serial.println(free_ram());    
   }
-
+  **/
   if (nano.check() == true) {
     
     byte responseType = nano.parseResponse(); //Break response into tag ID, RSSI, frequency, and timestamp
@@ -109,9 +110,13 @@ void loop() {
         cardBytes [x] = nano.msg[31 + x];
       }
 
+      sendCardNow(cardBytes);
+      
+      /** group card code
       if (newCard(cardBytes, tagEPCBytes)) {
         cardDetect = true;
       }
+      **/
 
     }
     else if (responseType == ERROR_CORRUPT_RESPONSE)
@@ -123,6 +128,32 @@ void loop() {
       //Unknown response
       Serial.print(F("Unknown error"));
     }
+  }
+}
+
+void sendCardNow(byte c[]) {
+  EthernetClient *client;
+  char pubmsg[128] = "{\"card\":[\"";
+  for (byte x = 0 ; x < 12 ; x++)
+      {
+        if (c[x] < 0x10) {
+          sprintf(pubmsg + strlen(pubmsg), "0%X ",c[x]);
+        }
+        else {
+          sprintf(pubmsg + strlen(pubmsg), "%X ", c[x]);
+        }
+      }
+  pubmsg[strlen(pubmsg) - 1] = '\0'; //gets rid of extra space
+  strcat(pubmsg, "]}");
+  Serial.print(F("publishing message: "));
+  Serial.println(pubmsg);
+  client = PubNub.publish("mindreader", pubmsg);
+  digitalWrite(GLED, LOW);
+  if (!client) {
+    blinkLED(RLED);
+    Serial.println(F("publishing error"));
+  } else {
+    client->stop();
   }
 }
 
