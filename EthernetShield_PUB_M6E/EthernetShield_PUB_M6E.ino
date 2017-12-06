@@ -80,7 +80,7 @@ void setup() {
 
 void loop() {
   Ethernet.maintain();
-  /** Grouping cards code
+  
   unsigned long snap = millis();
   if ((now - snap) > 3000) {
     now = snap;
@@ -89,7 +89,7 @@ void loop() {
     Serial.print(F("Memory left: "));
     Serial.println(free_ram());    
   }
-  **/
+  
   if (nano.check() == true) {
     
     byte responseType = nano.parseResponse(); //Break response into tag ID, RSSI, frequency, and timestamp
@@ -110,13 +110,13 @@ void loop() {
         cardBytes [x] = nano.msg[31 + x];
       }
 
-      sendCardNow(cardBytes);
+      //sendCardNow(cardBytes); For sending individual cards
       
-      /** group card code
+      
       if (newCard(cardBytes, tagEPCBytes)) {
         cardDetect = true;
       }
-      **/
+      
 
     }
     else if (responseType == ERROR_CORRUPT_RESPONSE)
