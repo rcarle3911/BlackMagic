@@ -242,7 +242,7 @@ void pubSend() {
 void delOldCards() {  
   Card *current = tail;
   while (current) {
-    if ((now - current->rTime) > 30000) {
+    if ((now - current->rTime) > 20000) {
       tail = current->prev;
       tail->next = NULL;
       delete current;
