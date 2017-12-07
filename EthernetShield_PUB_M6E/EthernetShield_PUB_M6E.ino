@@ -223,10 +223,17 @@ void pubSend() {
     Serial.println(F("publishing error"));
   } else {
     current = head;
+    Serial.print(F("Cards in memory: "));
     while (current) {
+      for (int i = 0; i < 12; i++) {
+        Serial.print(" ");
+        Serial.print((int)current->epc[i]);
+      }      
       current->pbSent = true;
       current = current->next;
+      if (current) Serial.print(F(","));
     }
+    Serial.println();
     cardDetect = false;
     client->stop();
   }
