@@ -100,8 +100,6 @@ void loop() {
     now = snap;
     delOldCards();
     if (cardDetect) pubSend();
-    Serial.print(F("Memory left: "));
-    Serial.println(free_ram());
     delay(1000);
     nano.startReading();  
   }
@@ -217,6 +215,8 @@ void pubSend() {
   Serial.print(F("publishing message: "));
   Serial.println(pubmsg);
   client = PubNub.publish("mindreader", pubmsg);
+  Serial.print(F("Memory left: "));
+  Serial.println(free_ram());
   digitalWrite(GLED, LOW);
   if (!client) {
     blinkLED(RLED);
