@@ -12,12 +12,15 @@
 #define GLED 7
 #define RLED 6
 #define M6E_ENABLE 8
+#define SLEEP 2
 
 byte mac[] = {0x90,0xa2,0xda,0x10,0x10,0x4e};
 IPAddress ip(192, 168, 1, 177);
 
 SoftwareSerial softSerial(2, 3); //RX, TX
 RFID nano; //Create instance
+
+int sleepState = LOW;
 
 struct Card {
   byte epc[12];
@@ -41,7 +44,9 @@ void setup() {
   pinMode(GLED, OUTPUT);
   pinMode(RLED, OUTPUT);
   pinMode(M6E_ENABLE, OUTPUT);
-
+  //pinMode(SLEEP, INPUT);              Sleep code
+  //digitalWrite(SLEEP, HIGH);
+  //attachInterrupt(0, sleepNow, HIGH);
   blinkLED(GLED);
   blinkLED(RLED);
 
@@ -80,14 +85,25 @@ void setup() {
 
 void loop() {
   Ethernet.maintain();
-  
+
+  /** Sleep code to be tested.
+  sleepState = digitalRead(SLEEP);
+  if (sleepState == HIGH) {
+     digitalWrite(M6E_ENABLE, LOW); //Turns off M6E
+     sleep_enable();
+     attachInterrupt(0, SLEEP, LOW)
+  }
+  **/
   unsigned long snap = millis();
   if ((snap - now) > 3000) {
+    nano.stopReading();
     now = snap;
     delOldCards();
     if (cardDetect) pubSend();
     Serial.print(F("Memory left: "));
-    Serial.println(free_ram());    
+    Serial.println(free_ram());
+    delay(1000);
+    nano.startReading();  
   }
   
   if (nano.check() == true) {
@@ -130,6 +146,23 @@ void loop() {
     }
   }
 }
+
+/** Sleep code to be tested
+void wakeUp() {
+  sleep_disable
+  detachInterrupt(0);
+  sleepState = 0;
+}
+
+void sleepNow() {
+  set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+  sleep_enable();
+  attachInterrupt(0, wakeUp, LOW);
+  sleep_mode();
+  sleep_disable();
+  detachInterrupt(0);
+}
+**/
 
 void sendCardNow(byte c[]) {
   EthernetClient *client;
